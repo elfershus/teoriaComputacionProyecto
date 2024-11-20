@@ -1,0 +1,3 @@
+/home/fershus/Projects/teoriaComputacionProyecto/build/CMakeFiles/my_cpp_project.dir
+/home/fershus/Projects/teoriaComputacionProyecto/build/CMakeFiles/edit_cache.dir
+/home/fershus/Projects/teoriaComputacionProyecto/build/CMakeFiles/rebuild_cache.dir

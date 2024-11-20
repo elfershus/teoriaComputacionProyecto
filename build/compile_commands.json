@@ -1,0 +1,8 @@
+[
+{
+  "directory": "/home/fershus/Projects/teoriaComputacionProyecto/build",
+  "command": "/usr/bin/g++   -g -std=gnu++17 -o CMakeFiles/my_cpp_project.dir/src/main.cpp.o -c /home/fershus/Projects/teoriaComputacionProyecto/src/main.cpp",
+  "file": "/home/fershus/Projects/teoriaComputacionProyecto/src/main.cpp",
+  "output": "CMakeFiles/my_cpp_project.dir/src/main.cpp.o"
+}
+]
