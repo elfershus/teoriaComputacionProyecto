@@ -4,17 +4,34 @@
 #include <stack>
 #include <cmath>
 #include <stdexcept>
+#include <vector>
+#include <iomanip>
+#include <sstream>
 
 class Calculator {
 private:
-    // Regex patterns
-    const std::regex NUMBER_PATTERN{"\\d+(\\.\\d+)?"};  // Matches integers and decimals
-    const std::regex OPERATOR_PATTERN{"[+\\-*/^]"};     // Matches basic operators
-    const std::regex PARENTHESIS_PATTERN{"[(){}]"};     // Matches parentheses and braces
-    const std::regex WHITESPACE_PATTERN{"\\s+"};        // Matches whitespace
+    const std::regex NUMBER_PATTERN{"\\d+(\\.\\d+)?"};
+    const std::regex OPERATOR_PATTERN{"[+\\-*/^]"};
+    const std::regex PARENTHESIS_PATTERN{"[(){}]"};
+    const std::regex WHITESPACE_PATTERN{"\\s+"};
     const std::regex VALID_EXPRESSION{
-        "^[\\s]*([(){}]|\\d+(\\.\\d+)?|[+\\-*/^])+[\\s]*$"  // Matches valid expression structure
+        "^[\\s]*([(){}]|\\d+(\\.\\d+)?|[+\\-*/^])+[\\s]*$"
     };
+
+    std::vector<std::string> steps;
+
+    std::string replaceInExpression(const std::string& expr, size_t start, size_t length, const std::string& replacement) {
+        std::string result = expr;
+        result.replace(start, length, replacement);
+        return result;
+    }
+
+    void addStep(const std::string& step) {
+        // Only add the step if it's different from the last one
+        if (steps.empty() || steps.back() != step) {
+            steps.push_back(step);
+        }
+    }
 
     bool isOperator(char c) {
         return c == '+' || c == '-' || c == '*' || c == '/' || c == '^';
@@ -25,6 +42,70 @@ private:
         if (op == '*' || op == '/') return 2;
         if (op == '+' || op == '-') return 1;
         return 0;
+    }
+
+    std::string formatNumber(double num) {
+        std::ostringstream ss;
+        ss << std::fixed << std::setprecision(2);
+        ss << num;
+        std::string str = ss.str();
+        // Remove trailing zeros and decimal point if not needed
+        if (str.find('.') != std::string::npos) {
+            str = str.substr(0, str.find_last_not_of('0') + 1);
+            if (str.back() == '.') {
+                str = str.substr(0, str.size() - 1);
+            }
+        }
+        return str;
+    }
+
+    std::string evaluateSubExpression(const std::string& expr, size_t start, size_t end) {
+        std::string subExpr = expr.substr(start, end - start + 1);
+        std::stack<double> values;
+        std::stack<char> ops;
+        std::string currentNum;
+
+        for (size_t i = 0; i < subExpr.length(); i++) {
+            char c = subExpr[i];
+            if (std::isdigit(c) || c == '.') {
+                currentNum += c;
+            } else {
+                if (!currentNum.empty()) {
+                    values.push(std::stod(currentNum));
+                    currentNum.clear();
+                }
+                if (isOperator(c)) {
+                    while (!ops.empty() && getPrecedence(ops.top()) >= getPrecedence(c)) {
+                        double b = values.top(); values.pop();
+                        double a = values.top(); values.pop();
+                        char op = ops.top(); ops.pop();
+                        values.push(applyOperation(a, b, op));
+                        
+                        // Add intermediate step
+                        std::string step = formatNumber(a) + " " + op + " " + formatNumber(b) + " = " + formatNumber(values.top());
+                        addStep(step);
+                    }
+                    ops.push(c);
+                }
+            }
+        }
+
+        if (!currentNum.empty()) {
+            values.push(std::stod(currentNum));
+        }
+
+        while (!ops.empty()) {
+            double b = values.top(); values.pop();
+            double a = values.top(); values.pop();
+            char op = ops.top(); ops.pop();
+            values.push(applyOperation(a, b, op));
+            
+            // Add intermediate step
+            std::string step = formatNumber(a) + " " + op + " " + formatNumber(b) + " = " + formatNumber(values.top());
+            addStep(step);
+        }
+
+        return formatNumber(values.top());
     }
 
     double applyOperation(double a, double b, char op) {
@@ -46,13 +127,37 @@ private:
     }
 
 public:
+    void printRegexMatches(const std::string& expression) {
+        std::cout << "\nRegex Pattern Matches:" << std::endl;
+        
+        std::cout << "Numbers found:" << std::endl;
+        auto numbers_begin = std::sregex_iterator(expression.begin(), expression.end(), NUMBER_PATTERN);
+        auto numbers_end = std::sregex_iterator();
+        for (std::sregex_iterator i = numbers_begin; i != numbers_end; ++i) {
+            std::cout << "  - " << i->str() << std::endl;
+        }
+
+        std::cout << "Operators found:" << std::endl;
+        auto operators_begin = std::sregex_iterator(expression.begin(), expression.end(), OPERATOR_PATTERN);
+        auto operators_end = std::sregex_iterator();
+        for (std::sregex_iterator i = operators_begin; i != operators_end; ++i) {
+            std::cout << "  - " << i->str() << std::endl;
+        }
+
+        std::cout << "Parentheses/Braces found:" << std::endl;
+        auto parens_begin = std::sregex_iterator(expression.begin(), expression.end(), PARENTHESIS_PATTERN);
+        auto parens_end = std::sregex_iterator();
+        for (std::sregex_iterator i = parens_begin; i != parens_end; ++i) {
+            std::cout << " " << i->str() << " ";
+        }
+        std::cout << std::endl;
+    }
+
     void validateExpression(const std::string& expression) {
-        // Check if expression matches valid pattern
         if (!std::regex_match(expression, VALID_EXPRESSION)) {
             throw std::invalid_argument("Invalid expression format");
         }
 
-        // Check brackets balance
         std::stack<char> brackets;
         for (char c : expression) {
             if (c == '(' || c == '{') {
@@ -69,58 +174,48 @@ public:
         }
     }
 
-    double evaluate(std::string expression) {
+    double evaluate(const std::string& expression) {
+        steps.clear();
+        std::string currentExpr = expression;
+        addStep(currentExpr);
         validateExpression(expression);
+        printRegexMatches(expression);
 
-        std::stack<double> values;
-        std::stack<char> operators;
-
-        for (size_t i = 0; i < expression.length(); i++) {
-            char c = expression[i];
-
-            if (std::isspace(c)) continue;
-
-            if (c == '(' || c == '{') {
-                operators.push(c);
-            }
-            else if (std::isdigit(c)) {
-                std::string num;
-                while (i < expression.length() && 
-                      (std::isdigit(expression[i]) || expression[i] == '.')) {
-                    num += expression[i++];
+        // Keep evaluating until we have a single number
+        while (true) {
+            // Find innermost parentheses
+            size_t openPos = currentExpr.find_last_of("({");
+            if (openPos == std::string::npos) {
+                // No more parentheses, evaluate the remaining expression
+                if (std::regex_search(currentExpr, OPERATOR_PATTERN)) {
+                    std::string result = evaluateSubExpression(currentExpr, 0, currentExpr.length() - 1);
+                    addStep(result);
                 }
-                i--;
-                values.push(std::stod(num));
+                break;
             }
-            else if (c == ')' || c == '}') {
-                while (!operators.empty() && operators.top() != '(' && operators.top() != '{') {
-                    double val2 = values.top(); values.pop();
-                    double val1 = values.top(); values.pop();
-                    char op = operators.top(); operators.pop();
-                    values.push(applyOperation(val1, val2, op));
-                }
-                if (!operators.empty()) operators.pop();
+
+            // Find matching closing parenthesis
+            size_t closePos = currentExpr.find_first_of(")}", openPos);
+            if (closePos == std::string::npos) {
+                throw std::invalid_argument("Mismatched parentheses");
             }
-            else if (isOperator(c)) {
-                while (!operators.empty() && operators.top() != '(' && operators.top() != '{' &&
-                       getPrecedence(operators.top()) >= getPrecedence(c)) {
-                    double val2 = values.top(); values.pop();
-                    double val1 = values.top(); values.pop();
-                    char op = operators.top(); operators.pop();
-                    values.push(applyOperation(val1, val2, op));
-                }
-                operators.push(c);
-            }
+
+            // Evaluate the subexpression
+            std::string subExprResult = evaluateSubExpression(currentExpr, openPos + 1, closePos - 1);
+            
+            // Replace the parentheses and their contents with the result
+            currentExpr = replaceInExpression(currentExpr, openPos, closePos - openPos + 1, subExprResult);
+            addStep(currentExpr);
         }
 
-        while (!operators.empty()) {
-            double val2 = values.top(); values.pop();
-            double val1 = values.top(); values.pop();
-            char op = operators.top(); operators.pop();
-            values.push(applyOperation(val1, val2, op));
-        }
+        return std::stod(steps.back());
+    }
 
-        return values.top();
+    void printSteps() {
+        std::cout << "\nEvaluation Steps:" << std::endl;
+        for (size_t i = 0; i < steps.size(); i++) {
+            std::cout << i + 1 << ". " << steps[i] << std::endl;
+        }
     }
 };
 
@@ -137,8 +232,10 @@ int main() {
         }
 
         try {
+            std::cout << "\nExpression: " << expression << std::endl;
             double result = calc.evaluate(expression);
-            std::cout << "Result: " << result << std::endl;
+            calc.printSteps();
+            std::cout << "\nResult: " << result << std::endl;
         } catch (const std::exception& e) {
             std::cout << "Error: " << e.what() << std::endl;
         }
